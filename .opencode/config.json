@@ -1,0 +1,8 @@
+{
+  "packageManager": "bun",
+  "scripts": {
+    "install": "bun install",
+    "dev": "bun run dev",
+    "build": "bun run build"
+  }
+}

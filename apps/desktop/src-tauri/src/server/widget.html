@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, Arial, sans-serif; --background: #141416; --primary: #f6f2ea; --secondary: #aaa7a1; --accent: #d4a56a; --radius: 8px; --motion-duration: 220ms; --motion-easing: ease; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: transparent; color: var(--primary); }
+    #widget { position: relative; display: none; width: fit-content; max-width: 100vw; background: var(--background); border-radius: var(--radius); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 20%, transparent)); opacity: 1; transition: opacity var(--motion-duration) var(--motion-easing), transform var(--motion-duration) var(--motion-easing), filter var(--motion-duration) var(--motion-easing); }
+    #widget.style-editorial { border-left: 3px solid var(--accent); } #widget.style-neon { filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 60%, transparent)); } #widget.style-soft { filter: drop-shadow(0 10px 22px rgb(0 0 0 / .28)) saturate(.86) brightness(1.06); }
+    #widget.motion-fade, #widget.motion-slide, #widget.motion-scale, #widget.motion-blur { opacity: 0; } #widget.motion-slide { transform: translateX(-18px); } #widget.motion-scale { transform: scale(.92); } #widget.motion-blur { filter: blur(8px); } #widget.playback-pulse { animation: playback-pulse var(--motion-duration) var(--motion-easing); } @keyframes playback-pulse { 50% { transform: scale(1.018); filter: brightness(1.14); } }
+    .artwork-shell { flex: none; overflow: hidden; background: linear-gradient(145deg, #303038, #101014); }
+    #artwork { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .35s ease; }
+    #artwork.loaded { opacity: 1; }
+    .copy { min-width: 0; }
+    #title, #artists { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #title { color: var(--primary); font-weight: 700; }
+    #artists { margin-top: 4px; color: var(--secondary); font-size: 12px; }
+    #status { color: var(--secondary); font-size: 10px; font-style: normal; letter-spacing: .1em; }
+    #progress { position: absolute; right: 0; bottom: 0; left: 0; width: 100%; max-width: 100%; height: 2px; box-sizing: border-box; overflow: hidden; border-radius: inherit; background: rgb(255 255 255 / .15); pointer-events: none; }
+    #progress i { display: block; width: 0; height: 100%; background: var(--accent); transition: background-color .5s ease; }
+
+    #widget.compact { align-items: center; gap: 12px; width: min(420px, 100vw); padding: 10px; }
+    .compact .artwork-shell { width: 48px; height: 48px; border-radius: 4px; }.compact #title { font-size: 14px; }
+    #widget.minimal { padding: 10px 14px; }.minimal .artwork-shell, .minimal #status { display: none; }
+    #widget.card { align-items: center; gap: 14px; width: min(300px, 100vw); min-height: 96px; padding: 16px; box-shadow: 0 12px 30px rgb(0 0 0 / .28); }
+    .card .artwork-shell { width: 64px; height: 64px; border-radius: 6px; }.card #title { font-size: 16px; }.card #status { display: none; }
+    #widget.coverFocus { width: min(260px, 100vw); aspect-ratio: 1; overflow: hidden; }
+    .coverFocus .artwork-shell { position: absolute; inset: 0; }.coverFocus .copy { position: absolute; right: 0; bottom: 0; left: 0; display: grid; gap: 4px; padding: 34px 16px 16px; background: linear-gradient(transparent, rgb(0 0 0 / .84)); }.coverFocus #status { display: none; }
+    #widget.horizontal { align-items: center; gap: 12px; width: min(440px, 100vw); padding: 12px 16px; }
+    .horizontal .artwork-shell { flex: none; width: 40px; height: 40px; border-radius: 4px; background: var(--accent); transition: background-color .5s ease; }.horizontal #artwork { width: 100%; height: 100%; object-fit: cover; }.horizontal .copy { min-width: 0; flex: 1; }.horizontal #status { flex: none; }
+    #widget.vinyl { align-items: center; gap: 14px; width: min(320px, 100vw); padding: 12px; }
+    .vinyl .artwork-shell { position: relative; flex: none; width: 64px; height: 64px; overflow: hidden; border: 5px solid #080808; border-radius: 50%; background: repeating-radial-gradient(#202024 0 2px, #111 3px 5px); }
+    .vinyl .artwork-shell::before { position: absolute; inset: 0; z-index: 1; border-radius: 50%; background: repeating-radial-gradient(circle at center, rgb(255 255 255 / .04) 0 2px, rgb(0 0 0 / .28) 3px 5px, transparent 6px 9px), radial-gradient(circle at center, transparent 0 12%, rgb(0 0 0 / .48) 12.5% 13%, transparent 13.5% 100%); box-shadow: inset 0 0 0 10px rgb(0 0 0 / .16); content: ''; mix-blend-mode: overlay; opacity: .9; }
+    .vinyl .artwork-shell::after { position: absolute; inset: 50%; z-index: 2; width: 7px; height: 7px; transform: translate(-50%, -50%); border: 2px solid var(--accent); border-radius: 50%; background: #090909; box-shadow: 0 0 0 5px rgb(0 0 0 / .22); content: ''; }
+    .vinyl #artwork { position: relative; z-index: 0; width: 100%; height: 100%; object-fit: cover; }.vinyl .copy { min-width: 0; flex: 1; }.vinyl #status { display: none; }.vinyl.playing .artwork-shell { animation: rotation 4s linear infinite; }
+    @keyframes rotation { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #widget, #artwork, #progress i, .vinyl.playing .artwork-shell { transition: none !important; animation: none !important; } }
+  </style>
+</head>
+<body>
+  <div id="widget" role="status" aria-live="polite">
+    <div class="artwork-shell"><img id="artwork" alt="" loading="lazy" decoding="async"></div>
+    <div class="copy"><div id="title"></div><div id="artists"></div></div>
+    <em id="status"></em>
+    <div id="progress" aria-hidden="true"><i></i></div>
+  </div>
+  <script>
+    const layouts = new Set(['minimal', 'compact', 'card', 'coverFocus', 'horizontal', 'vinyl']);
+    const params = new URLSearchParams(location.search);
+    const color = (name, fallback) => /^#[0-9a-f]{6}$/i.test(params.get(name) || '') ? params.get(name) : fallback;
+    const layout = layouts.has(params.get('layout')) ? params.get('layout') : 'compact';
+    const accentMode = params.get('accentMode') === 'custom' ? 'custom' : 'artwork';
+    const presets = new Set(['none', 'fade', 'slide', 'scale', 'blur']);
+    const easings = new Set(['ease', 'ease-in', 'ease-out', 'ease-in-out', 'linear']);
+    const animation = (event, fallback) => {
+      const [preset, duration, easing] = (params.get(`animation-${event}`) || '').split(',');
+      return { preset: presets.has(preset) ? preset : fallback[0], duration: Math.min(2000, Math.max(0, Number(duration) || fallback[1])), easing: easings.has(easing) ? easing : fallback[2] };
+    };
+    const animations = { show: animation('show', ['fade', 220, 'ease-out']), hide: animation('hide', ['fade', 180, 'ease-in']), change: animation('change', ['slide', 260, 'ease-in-out']), playback: animation('playback', ['scale', 160, 'ease-out']) };
+    const styleTemplate = new Set(['default', 'editorial', 'neon', 'soft', 'custom']).has(params.get('style')) ? params.get('style') : 'default';
+    const customAccent = color('accent', '#d4a56a');
+    const radiusValue = params.get('radius');
+    const radius = radiusValue !== null && Number.isFinite(Number(radiusValue)) ? Math.min(32, Math.max(0, Number(radiusValue))) : 8;
+    const root = document.documentElement.style;
+    root.setProperty('--background', color('background', '#141416'));
+    root.setProperty('--primary', color('primary', '#f6f2ea'));
+    root.setProperty('--secondary', color('secondary', '#aaa7a1'));
+    root.setProperty('--accent', customAccent);
+    root.setProperty('--radius', `${radius}px`);
+
+    const widget = document.getElementById('widget');
+    const title = document.getElementById('title');
+    const artists = document.getElementById('artists');
+    const artwork = document.getElementById('artwork');
+    const artworkShell = document.querySelector('.artwork-shell');
+    const status = document.getElementById('status');
+    const progress = document.getElementById('progress');
+    const progressFill = progress.firstElementChild;
+    const accentCache = new Map();
+    let media = null;
+    let progressAnchor = null;
+    let artworkUrl = '';
+    let trackKey = '';
+    let renderTimer;
+    widget.className = layout;
+
+    function decodeCss(value) {
+      if (!value || value.length > 1900) return '';
+      try { return decodeURIComponent(escape(atob(value))); } catch { return ''; }
+    }
+    function applyCss(css) {
+      for (const declaration of css.split(';')) {
+        const [property, ...values] = declaration.split(':');
+        const value = values.join(':').trim();
+        if (/^(--[a-z0-9-]+|[a-z-]+)$/i.test((property || '').trim()) && value && !/[<>{}]|url\s*\(|expression\s*\(|@import/i.test(value)) widget.style.setProperty(property.trim(), value);
+      }
+    }
+    widget.classList.add(`style-${styleTemplate}`);
+    applyCss(decodeCss(params.get('css')));
+
+    function safeArtwork(value) {
+      if (typeof value !== 'string' || value.length > 8192) return '';
+      try { const url = new URL(value); return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : ''; } catch { return ''; }
+    }
+
+    function setArtwork(url) {
+      if (url === artworkUrl) return;
+      artworkUrl = url;
+      artwork.classList.remove('loaded');
+      if (!url) {
+        artwork.removeAttribute('src');
+        artworkShell.style.visibility = layout === 'horizontal' ? 'visible' : 'hidden';
+        root.setProperty('--accent', customAccent);
+        return;
+      }
+      artworkShell.style.visibility = 'visible';
+      artwork.src = url;
+      if (accentMode === 'artwork') extractAccent(url);
+    }
+
+    function extractAccent(url) {
+      if (accentCache.has(url)) { root.setProperty('--accent', accentCache.get(url)); return; }
+      const probe = new Image();
+      probe.crossOrigin = 'anonymous';
+      probe.onload = () => {
+        try {
+          const canvas = document.createElement('canvas'); canvas.width = 24; canvas.height = 24;
+          const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(probe, 0, 0, 24, 24);
+          const data = context.getImageData(0, 0, 24, 24).data;
+          let red = 0, green = 0, blue = 0, weight = 0;
+          for (let index = 0; index < data.length; index += 16) {
+            const r = data[index], g = data[index + 1], b = data[index + 2];
+            const max = Math.max(r, g, b), min = Math.min(r, g, b), lightness = (max + min) / 510;
+            const saturation = max === min ? 0 : (max - min) / (255 - Math.abs(max + min - 255));
+            if (lightness < .12 || lightness > .88 || saturation < .15) continue;
+            const pixelWeight = .25 + saturation; red += r * pixelWeight; green += g * pixelWeight; blue += b * pixelWeight; weight += pixelWeight;
+          }
+          if (!weight) return;
+          const value = `rgb(${Math.round(red / weight)} ${Math.round(green / weight)} ${Math.round(blue / weight)})`;
+          accentCache.set(url, value); root.setProperty('--accent', value);
+        } catch { root.setProperty('--accent', customAccent); }
+      };
+      probe.onerror = () => root.setProperty('--accent', customAccent);
+      probe.src = url;
+    }
+
+    artwork.addEventListener('load', () => artwork.classList.add('loaded'));
+    artwork.addEventListener('error', () => { artwork.classList.remove('loaded'); artworkShell.style.visibility = 'hidden'; });
+
+    function applyMedia(next) {
+      media = next;
+      syncProgress(next);
+      if (!media || typeof media.title !== 'string' || !media.title.trim()) return;
+      title.textContent = media.title;
+      artists.textContent = Array.isArray(media.artists) ? media.artists.filter(item => typeof item === 'string').join(', ') : '';
+      status.textContent = media.isPlaying ? 'LIVE' : 'PAUSED';
+      widget.classList.toggle('playing', Boolean(media.isPlaying));
+      setArtwork(safeArtwork(media.artwork));
+      widget.style.display = 'flex';
+    }
+
+    function syncProgress(next) {
+      if (!next || !(Number(next.duration) > 0) || !Number.isFinite(Number(next.position))) {
+        progressAnchor = null;
+        return;
+      }
+      const key = String(next.trackId || `${next.title}:${Array.isArray(next.artists) ? next.artists.join(',') : ''}`);
+      const duration = Number(next.duration);
+      const incomingPosition = Math.min(duration, Math.max(0, Number(next.position)));
+      const incomingUpdatedAt = Number(next.timestamps?.updatedAt);
+      const timestamp = Number.isFinite(incomingUpdatedAt) ? incomingUpdatedAt : Date.now();
+      const current = progressAnchor;
+      const projected = current && current.isPlaying ? current.position + (Date.now() - current.updatedAt) / 1000 : current?.position;
+      const drift = projected == null ? Number.POSITIVE_INFINITY : incomingPosition - projected;
+      const seekDetected = !current || current.trackKey !== key || Math.abs(drift) > 2 || current.duration !== duration;
+      if (seekDetected || !next.isPlaying || projected == null) {
+        progressAnchor = { trackKey: key, position: incomingPosition, updatedAt: timestamp, duration, isPlaying: Boolean(next.isPlaying) };
+      } else {
+        progressAnchor = { ...current, isPlaying: true };
+      }
+    }
+
+    function motion(event, done, leaving = false) {
+      const setting = animations[event];
+      root.setProperty('--motion-duration', `${setting.duration}ms`);
+      root.setProperty('--motion-easing', setting.easing);
+      if (setting.preset === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+      const className = `motion-${setting.preset}`;
+      widget.classList.add(className);
+      if (!leaving) requestAnimationFrame(() => { widget.classList.remove(className); });
+      setTimeout(() => { if (leaving) widget.classList.remove(className); done(); }, setting.duration);
+    }
+
+    function render(next) {
+      const nextKey = next ? String(next.trackId || `${next.title}:${Array.isArray(next.artists) ? next.artists.join(',') : ''}`) : '';
+      if (!nextKey) {
+        if (!trackKey) return;
+        clearTimeout(renderTimer); motion('hide', () => { widget.style.display = 'none'; }, true); trackKey = ''; return;
+      }
+      if (!trackKey) { trackKey = nextKey; applyMedia(next); motion('show', () => {}); return; }
+      if (trackKey !== nextKey) {
+        clearTimeout(renderTimer); motion('change', () => { trackKey = nextKey; applyMedia(next); }, true); return;
+      }
+      const changedPlayback = media && Boolean(media.isPlaying) !== Boolean(next.isPlaying);
+      applyMedia(next);
+      if (changedPlayback) { widget.classList.remove('playback-pulse'); requestAnimationFrame(() => widget.classList.add('playback-pulse')); setTimeout(() => widget.classList.remove('playback-pulse'), animations.playback.duration); }
+    }
+
+    function updateProgress() {
+      const anchor = progressAnchor;
+      if (!anchor || !(anchor.duration > 0)) { progress.style.display = 'none'; }
+      else {
+        const position = anchor.position + (anchor.isPlaying ? (Date.now() - anchor.updatedAt) / 1000 : 0);
+        progress.style.display = 'block'; progressFill.style.width = `${Math.min(100, Math.max(0, position / anchor.duration * 100))}%`;
+      }
+      requestAnimationFrame(updateProgress);
+    }
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+      const socket = new WebSocket(`${protocol}://${location.host}/ws`);
+      socket.onmessage = event => { try { render(JSON.parse(event.data)); } catch { render(null); } };
+      socket.onclose = () => setTimeout(connect, 2000);
+      socket.onerror = () => socket.close();
+    }
+    updateProgress(); connect();
+  </script>
+</body>
+</html>

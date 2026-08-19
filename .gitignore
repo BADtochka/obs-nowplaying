@@ -1,0 +1,44 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+
+# Build outputs
+.turbo/
+dist/
+**/dist/
+build/
+**/build/
+out/
+bin/
+
+# Rust/Tauri specific
+src-tauri/target/
+**/src-tauri/target/
+**/src-tauri/gen/
+**/*.rs.bk
+.tauri
+gen/
+
+# Plasmo/Extension specific
+.plasmo/
+**/build/chrome-mv3*/
+**/build/firefox-mv3*/
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Environment and Logs
+*.log
+*.local
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+temp/

@@ -1,0 +1,28 @@
+{
+  "name": "obs-playing",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:firefox": "turbo dev:firefox",
+    "build": "turbo build",
+    "build:firefox": "bun run --cwd apps/browser-extension build:firefox",
+    "typecheck": "tsc --noEmit && bun run --cwd apps/desktop vite:build",
+    "lint": "eslint .",
+    "test": "bun run --cwd apps/desktop test"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.4",
+    "eslint": "^9.0.0",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "turbo": "latest",
+    "typescript": "^5.2.2",
+    "typescript-eslint": "^8.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "bun@1.3.10"
+}

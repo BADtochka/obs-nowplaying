@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OBS Playing",
+  "identifier": "com.obsplaying.desktop",
+  "build": {
+    "beforeDevCommand": "bun run vite:dev",
+    "beforeBuildCommand": "bun run vite:build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "OBS Playing",
+        "width": 800,
+        "height": 1000,
+        "label": "main"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:3030 ws://localhost:3030 ws://127.0.0.1:1420 ws://localhost:1420; img-src 'self' asset: http: https: data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"]
+  }
+}

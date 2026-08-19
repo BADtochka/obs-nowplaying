@@ -1,0 +1,29 @@
+{
+  "name": "browser-extension",
+  "displayName": "OBS Playing",
+  "description": "Sends supported browser media sessions to OBS Playing.",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "plasmo dev",
+    "dev:firefox": "plasmo dev --target=firefox-mv3",
+    "build": "plasmo build",
+    "build:firefox": "plasmo build --target=firefox-mv3",
+    "package": "plasmo package"
+  },
+  "dependencies": {
+    "@obs-playing/shared": "workspace:*",
+    "plasmo": "latest",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "latest",
+    "@types/node": "latest",
+    "typescript": "latest"
+  },
+  "manifest": {
+    "host_permissions": [
+      "http://127.0.0.1:3030/*"
+    ]
+  }
+}
