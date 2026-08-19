@@ -3,9 +3,9 @@ import { Check, Copy } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import type { Translate } from '@/app/i18n';
+import type { Translate } from '@/core/i18n';
 
-defineProps<{ url: string; copied: boolean; connected: boolean; cssTooLong: boolean; t: Translate }>();
+defineProps<{ url: string; copied: boolean; connected: boolean; t: Translate }>();
 defineEmits<{ copy: [] }>();
 </script>
 
@@ -22,7 +22,6 @@ defineEmits<{ copy: [] }>();
           ><Check v-if="copied" /><Copy v-else />{{ copied ? t('copied') : t('copy') }}</Button
         >
       </div>
-      <p v-if="cssTooLong" class="mt-2 text-xs text-destructive">{{ t('cssLong') }}</p>
       <p class="mt-3 text-xs leading-5 text-muted-foreground">
         {{ t('sourceHint') }}
         <span :class="connected ? 'text-emerald-500' : ''">{{ connected ? t('reachable') : t('checking') }}</span>

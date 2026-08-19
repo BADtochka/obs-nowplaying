@@ -9,7 +9,8 @@
     "dev:firefox": "plasmo dev --target=firefox-mv3",
     "build": "plasmo build",
     "build:firefox": "plasmo build --target=firefox-mv3",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "test": "bun test"
   },
   "dependencies": {
     "@obs-playing/shared": "workspace:*",
@@ -22,6 +23,9 @@
     "typescript": "latest"
   },
   "manifest": {
+    "action": {
+      "default_popup": "popup.html"
+    },
     "host_permissions": [
       "http://127.0.0.1:3030/*"
     ]

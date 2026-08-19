@@ -7,10 +7,11 @@ export interface WidgetSettings {
   primaryColor: string;
   secondaryColor: string;
   borderRadius: number;
+  cardPadding: number;
   accentMode: 'custom' | 'artwork';
   accentColor: string;
+  marqueeEnabled: boolean;
   animations: WidgetAnimations;
-  customCss: string;
 }
 
 export type AnimationPreset = 'none' | 'fade' | 'slide' | 'scale' | 'blur';

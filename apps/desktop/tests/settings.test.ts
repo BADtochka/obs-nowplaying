@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_VERSION, defaultSavedSettings, parseSavedSettings } from '../src/app/settings';
+import { SETTINGS_VERSION, defaultSavedSettings, parseSavedSettings } from '../src/core/settings';
 
 describe('parseSavedSettings', () => {
   it('returns independent defaults for missing or invalid data', () => {
@@ -13,7 +13,7 @@ describe('parseSavedSettings', () => {
       JSON.stringify({
         version: 2,
         layout: 'vinyl',
-        settings: { backgroundColor: '#abcdef', primaryColor: 'red', borderRadius: 90, customCss: 'font-size: 14px' },
+        settings: { backgroundColor: '#abcdef', primaryColor: 'red', borderRadius: 90, marqueeEnabled: false },
         transports: { nativeMediaPriority: -900, mode: 'nativeMedia' },
       }),
     );
@@ -22,8 +22,18 @@ describe('parseSavedSettings', () => {
     expect(parsed.settings.backgroundColor).toBe('#abcdef');
     expect(parsed.settings.primaryColor).toBe(defaultSavedSettings().settings.primaryColor);
     expect(parsed.settings.borderRadius).toBe(32);
+    expect(parsed.settings.cardPadding).toBe(12);
+    expect(parsed.settings.marqueeEnabled).toBe(false);
     expect(parsed.transports.nativeMediaPriority).toBe(-100);
     expect(parsed.transports.mode).toBe('nativeMedia');
+  });
+
+  it('migrates and clamps card padding', () => {
+    expect(parseSavedSettings(JSON.stringify({ settings: { cardPadding: 90 } })).settings.cardPadding).toBe(32);
+  });
+
+  it('maps the removed card preset to compact', () => {
+    expect(parseSavedSettings(JSON.stringify({ version: 5, layout: 'card' })).layout).toBe('compact');
   });
 
   it('rejects unknown layouts and future settings versions', () => {

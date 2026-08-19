@@ -1,4 +1,5 @@
 import { ExtensionTransport } from "../core/transport"
+import { statusSnapshot } from "../core/status"
 import type { MediaState } from "@obs-playing/shared"
 
 const transport = new ExtensionTransport()
@@ -6,6 +7,9 @@ const tabs = new Map<number, { state: MediaState; lastSeen: number }>()
 const STALE_TAB_MS = 8_000
 
 chrome.runtime.onMessage.addListener((message: unknown, sender) => {
+  if (isPopupRequest(message)) {
+    return Promise.resolve(statusSnapshot(transport.snapshot(), detectedMediaState()))
+  }
   const tabId = sender.tab?.id
   if (tabId === undefined || !isMediaState(message)) return
 
@@ -42,4 +46,12 @@ function isMediaState(value: unknown): value is MediaState {
     && Array.isArray(media.artists)
     && typeof media.isPlaying === "boolean"
     && typeof media.source?.service === "string"
+}
+
+function detectedMediaState() {
+  return [...tabs.values()].sort((left, right) => right.lastSeen - left.lastSeen)[0]?.state ?? null
+}
+
+function isPopupRequest(value: unknown): value is { type: "obs-playing:status" } {
+  return Boolean(value && typeof value === "object" && (value as { type?: unknown }).type === "obs-playing:status")
 }

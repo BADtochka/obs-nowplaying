@@ -8,10 +8,10 @@ import {
   defaultSavedSettings,
   parseSavedSettings,
   type SavedSettings,
-} from '@/app/settings';
-import { MAX_URL_CSS_LENGTH, buildWidgetUrl } from '@/app/widget-url';
-import type { Diagnostics, Section, TransportConfig } from '@/app/types';
-import type { Translate } from '@/app/i18n';
+} from '@/core/settings';
+import { buildWidgetUrl } from '@/core/widget-url';
+import type { Diagnostics, Section, TransportConfig } from '@/core/types';
+import type { Translate } from '@/core/i18n';
 
 export function useDesktopApp(t: Translate) {
   const initial = parseSavedSettings(localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY));
@@ -28,7 +28,6 @@ export function useDesktopApp(t: Translate) {
   const preview = computed(() => media.value ?? previewMedia);
   const activeMedia = computed(() => media.value ?? diagnostics.value?.activeMedia ?? null);
   const widgetUrl = computed(() => buildWidgetUrl(widgetBaseUrl.value, layout.value, settings));
-  const customCssTooLong = computed(() => settings.customCss.trim().length > MAX_URL_CSS_LENGTH);
   let socket: WebSocket | undefined;
   let reconnectTimer: number | undefined;
   let diagnosticsTimer: number | undefined;
@@ -149,7 +148,6 @@ export function useDesktopApp(t: Translate) {
     preview,
     activeMedia,
     widgetUrl,
-    customCssTooLong,
     refreshDiagnostics,
     resetSettings,
     copyWidgetUrl,

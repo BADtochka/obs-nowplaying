@@ -2,8 +2,9 @@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import ColorField from '@/components/controls/ColorField.vue';
-import type { Translate } from '@/app/i18n';
+import type { Translate } from '@/core/i18n';
 import type { WidgetSettings } from '@/media';
 
 defineProps<{ settings: WidgetSettings; t: Translate }>();
@@ -11,7 +12,6 @@ defineProps<{ settings: WidgetSettings; t: Translate }>();
 
 <template>
   <section class="min-w-0 space-y-4">
-    <h3 class="font-medium">{{ t('appearance') }}</h3>
     <div
       v-for="field in [
         ['backgroundColor', 'background'],
@@ -48,6 +48,20 @@ defineProps<{ settings: WidgetSettings; t: Translate }>();
         :step="1"
         @update:model-value="settings.borderRadius = $event?.[0] ?? 0"
       />
+    </div>
+    <div class="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center">
+      <div>
+        <Label>{{ t('cardPadding') }} <span class="text-muted-foreground">{{ settings.cardPadding }}px</span></Label>
+        <p class="mt-0.5 text-xs text-muted-foreground">{{ t('cardPaddingHint') }}</p>
+      </div>
+      <Slider :model-value="[settings.cardPadding]" :min="0" :max="32" :step="1" @update:model-value="settings.cardPadding = $event?.[0] ?? 0" />
+    </div>
+    <div class="flex items-center justify-between gap-4 rounded-md border border-border px-3 py-2.5">
+      <div>
+        <Label for="marquee">{{ t('marquee') }}</Label>
+        <p class="mt-0.5 text-xs text-muted-foreground">{{ t('marqueeHint') }}</p>
+      </div>
+      <Switch id="marquee" v-model="settings.marqueeEnabled" />
     </div>
   </section>
 </template>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { ColorPicker } from 'vue3-colorpicker';
+import 'vue3-colorpicker/style.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -23,19 +25,17 @@ function update(value: string) {
         <span class="size-5 rounded-sm border border-white/20" :style="{ backgroundColor: model }" />{{ model }}
       </Button>
     </PopoverTrigger>
-    <PopoverContent class="flex w-52 gap-2 p-2" align="start">
-      <label
-        class="relative grid size-9 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-md border border-input"
-      >
-        <span class="size-5 rounded-sm" :style="{ backgroundColor: model }" />
-        <input
-          :value="model"
-          type="color"
-          class="absolute inset-0 cursor-pointer opacity-0"
-          :aria-label="props.label"
-          @input="update(($event.target as HTMLInputElement).value)"
-        />
-      </label>
+    <PopoverContent class="w-[18rem] space-y-3 p-3" align="start">
+      <ColorPicker
+        class="!w-full !overflow-visible pr-4"
+        :pure-color="model"
+        is-widget
+        disable-alpha
+        disable-history
+        format="hex"
+        theme="black"
+        @update:pure-color="update(String($event))"
+      />
       <Input
         :model-value="draft"
         :aria-label="props.hexLabel"

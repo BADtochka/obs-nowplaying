@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import type { Translate } from '@/app/i18n';
-import type { Diagnostics, TransportConfig } from '@/app/types';
+import type { Translate } from '@/core/i18n';
+import type { Diagnostics, TransportConfig } from '@/core/types';
 
 const props = defineProps<{
   transports: TransportConfig;

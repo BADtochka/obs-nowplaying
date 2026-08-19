@@ -1,49 +1,16 @@
 <script setup lang="ts">
 import type { MediaState, WidgetSettings } from '@/media';
 import Artwork from '../Artwork.vue';
+import MarqueeText from '../MarqueeText.vue';
 defineProps<{ media: MediaState; settings: WidgetSettings }>();
+defineEmits<{ 'artwork-accent': [resource: { src: string; accent: string | null }] }>();
 </script>
 <template>
-  <div class="card" :style="{ background: settings.backgroundColor, borderRadius: `${settings.borderRadius}px` }">
-    <Artwork v-if="media.artwork" :src="media.artwork" class="artwork" />
-    <div class="copy">
-      <div :style="{ color: settings.primaryColor }">{{ media.title }}</div>
-      <small :style="{ color: settings.secondaryColor }">{{ media.artists.join(', ') }}</small>
+  <div class="box-border flex min-h-24 w-[300px] max-w-full items-center gap-3.5">
+    <Artwork v-if="media.artwork" :src="media.artwork" class="size-16 shrink-0 rounded-md object-cover" @accent="$emit('artwork-accent', $event)" />
+    <div class="min-w-0 text-base font-bold">
+      <MarqueeText :text="media.title" :enabled="settings.marqueeEnabled" :style="{ color: settings.primaryColor }" />
+      <MarqueeText class="mt-[5px] text-xs font-medium" :text="media.artists.join(', ')" :enabled="settings.marqueeEnabled" :style="{ color: settings.secondaryColor }" />
     </div>
   </div>
 </template>
-<style scoped>
-.card {
-  width: 300px;
-  min-height: 96px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  box-shadow: 0 12px 30px rgb(0 0 0 / 0.28);
-}
-.artwork {
-  width: 64px;
-  height: 64px;
-  border-radius: 6px;
-  object-fit: cover;
-}
-.copy {
-  min-width: 0;
-  font-size: 16px;
-  font-weight: 700;
-}
-.copy > div,
-small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.copy small {
-  margin-top: 5px;
-  font-size: 12px;
-  font-weight: 500;
-}
-</style>

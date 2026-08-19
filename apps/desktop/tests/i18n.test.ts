@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectLocale } from '../src/app/i18n';
+import { detectLocale } from '../src/core/i18n';
 
 describe('detectLocale', () => {
   it('prefers a persisted supported locale', () => {

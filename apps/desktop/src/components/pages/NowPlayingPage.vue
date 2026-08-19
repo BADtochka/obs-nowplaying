@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { MediaState } from '@/media';
-import type { Translate } from '@/app/i18n';
+import type { Translate } from '@/core/i18n';
 
 const props = defineProps<{ media: MediaState | null; locale: string; t: Translate }>();
 defineEmits<{ openTransports: [] }>();

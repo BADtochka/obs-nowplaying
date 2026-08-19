@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { layoutRegistry } from './layouts';
+import WidgetCard from './layouts/WidgetCard.vue';
 import type { AnimationSetting, MediaState, WidgetSettings } from '../media';
+import { shouldResetArtworkAccent } from '../artwork-accent';
 
 const props = defineProps<{ media: MediaState | null; layout: string; settings: WidgetSettings }>();
 const currentLayout = computed(() => {
   return layoutRegistry[props.layout] ?? layoutRegistry.compact;
 });
-const accentCache = new Map<string, string>();
 const artworkAccent = ref(props.settings.accentColor);
 const now = ref(Date.now());
 let animationFrame = 0;
@@ -38,26 +39,26 @@ const progress = computed(() => {
   return Math.min(100, Math.max(0, (position / anchor.duration) * 100));
 });
 
-const transitionName = computed(() => `motion-${animation.value.preset}`);
 const transitionStyle = computed(() => ({
   '--motion-duration': `${animation.value.duration}ms`,
   '--motion-easing': animation.value.easing,
 }));
-const customStyle = computed(() => {
-  const style: Record<string, string> = {};
-  for (const declaration of props.settings.customCss.split(';')) {
-    const [property, ...values] = declaration.split(':');
-    const value = values.join(':').trim();
-    if (
-      /^(--[a-z0-9-]+|[a-z-]+)$/i.test(property?.trim() ?? '') &&
-      value &&
-      !/[<>{}]|url\s*\(|expression\s*\(|@import/i.test(value)
-    )
-      style[property.trim()] = value;
+const transitionClasses = computed(() => {
+  const active =
+    'transition-[opacity,transform,filter] [transition-duration:var(--motion-duration)] [transition-timing-function:var(--motion-easing)] motion-reduce:transition-none';
+  switch (animation.value.preset) {
+    case 'slide':
+      return { active, enterFrom: 'opacity-0 translate-x-[18px]', leaveTo: 'opacity-0 -translate-x-[18px]' };
+    case 'scale':
+      return { active, enterFrom: 'opacity-0 scale-[0.92]', leaveTo: 'opacity-0 scale-[0.92]' };
+    case 'blur':
+      return { active, enterFrom: 'opacity-0 blur-[8px]', leaveTo: 'opacity-0 blur-[8px]' };
+    case 'none':
+      return { active: 'transition-none', enterFrom: '', leaveTo: '' };
+    default:
+      return { active, enterFrom: 'opacity-0', leaveTo: 'opacity-0' };
   }
-  return style;
 });
-
 function trackKey(media: MediaState | null) {
   return media ? media.trackId || `${media.title}:${media.artists.join(',')}` : '';
 }
@@ -120,68 +121,17 @@ watch(
 );
 
 watch(
-  () => [props.media?.artwork, props.settings.accentMode, props.settings.accentColor] as const,
-  ([url, mode, fallback], _, onCleanup) => {
-    if (mode !== 'artwork' || !url) {
-      artworkAccent.value = fallback;
-      return;
-    }
-    const cached = accentCache.get(url);
-    if (cached) {
-      artworkAccent.value = cached;
-      return;
-    }
-    const image = new Image();
-    let active = true;
-    image.crossOrigin = 'anonymous';
-    image.decoding = 'async';
-    image.onload = () => {
-      if (!active) return;
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 24;
-        canvas.height = 24;
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-        if (!context) return;
-        context.drawImage(image, 0, 0, 24, 24);
-        const data = context.getImageData(0, 0, 24, 24).data;
-        let red = 0;
-        let green = 0;
-        let blue = 0;
-        let weight = 0;
-        for (let index = 0; index < data.length; index += 16) {
-          const r = data[index];
-          const g = data[index + 1];
-          const b = data[index + 2];
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const lightness = (max + min) / 510;
-          const saturation = max === min ? 0 : (max - min) / (255 - Math.abs(max + min - 255));
-          if (lightness < 0.12 || lightness > 0.88 || saturation < 0.15) continue;
-          const pixelWeight = 0.25 + saturation;
-          red += r * pixelWeight;
-          green += g * pixelWeight;
-          blue += b * pixelWeight;
-          weight += pixelWeight;
-        }
-        if (!weight) return;
-        const color = `rgb(${Math.round(red / weight)} ${Math.round(green / weight)} ${Math.round(blue / weight)})`;
-        accentCache.set(url, color);
-        artworkAccent.value = color;
-      } catch {
-        artworkAccent.value = fallback;
-      }
-    };
-    image.onerror = () => {
-      if (active) artworkAccent.value = fallback;
-    };
-    image.src = url;
-    onCleanup(() => {
-      active = false;
-    });
+  () => [props.media?.artwork, props.settings.accentMode] as const,
+  (next, previous) => {
+    if (shouldResetArtworkAccent(previous, next)) artworkAccent.value = props.settings.accentColor;
   },
   { immediate: true },
 );
+
+function applyArtworkAccent(resource: { src: string; accent: string | null }) {
+  if (props.settings.accentMode !== 'artwork' || props.media?.artwork !== resource.src) return;
+  artworkAccent.value = resource.accent ?? props.settings.accentColor;
+}
 
 onBeforeUnmount(() => {
   window.cancelAnimationFrame(animationFrame);
@@ -190,107 +140,29 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <div
-    class="widget-frame"
-    :class="{ 'playback-pulse': playbackPulse }"
-    :style="[{ '--accent': accent }, customStyle, transitionStyle]"
+    class="relative inline-flex max-w-full min-w-0 flex-col transition-[filter] duration-500 [transition-timing-function:ease] motion-reduce:transition-none"
+    :class="{
+      'animate-playback-pulse [animation-duration:var(--motion-duration)] [animation-timing-function:var(--motion-easing)] motion-reduce:animate-none': playbackPulse,
+    }"
+    :style="[{ '--accent': accent }, transitionStyle]"
   >
-    <Transition :name="transitionName" mode="out-in" :duration="animation.duration" @after-leave="afterLeave">
-      <component
+    <Transition
+      :enter-active-class="transitionClasses.active"
+      :leave-active-class="transitionClasses.active"
+      :enter-from-class="transitionClasses.enterFrom"
+      :leave-to-class="transitionClasses.leaveTo"
+      mode="out-in"
+      :duration="animation.duration"
+      @after-leave="afterLeave"
+    >
+      <WidgetCard
         v-if="visible && renderedMedia"
-        :is="currentLayout"
         :key="trackKey(renderedMedia)"
-        :media="renderedMedia"
         :settings="settings"
-      />
+        :progress="progress"
+      >
+        <component :is="currentLayout.component" :media="renderedMedia" :settings="settings" @artwork-accent="applyArtworkAccent" />
+      </WidgetCard>
     </Transition>
-    <div v-if="progress !== null" class="progress" aria-hidden="true"><i :style="{ width: `${progress}%` }" /></div>
   </div>
 </template>
-
-<style scoped>
-.widget-frame {
-  position: relative;
-  width: fit-content;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 18%, transparent));
-  transition: filter 0.5s ease;
-}
-.progress {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 0.15);
-}
-.progress i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  transition: background-color 0.5s ease;
-}
-.motion-fade-enter-active,
-.motion-fade-leave-active,
-.motion-slide-enter-active,
-.motion-slide-leave-active,
-.motion-scale-enter-active,
-.motion-scale-leave-active,
-.motion-blur-enter-active,
-.motion-blur-leave-active {
-  transition:
-    opacity var(--motion-duration) var(--motion-easing),
-    transform var(--motion-duration) var(--motion-easing),
-    filter var(--motion-duration) var(--motion-easing);
-}
-.motion-fade-enter-from,
-.motion-fade-leave-to {
-  opacity: 0;
-}
-.motion-slide-enter-from {
-  opacity: 0;
-  transform: translateX(18px);
-}
-.motion-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-18px);
-}
-.motion-scale-enter-from,
-.motion-scale-leave-to {
-  opacity: 0;
-  transform: scale(0.92);
-}
-.motion-blur-enter-from,
-.motion-blur-leave-to {
-  opacity: 0;
-  filter: blur(8px);
-}
-.motion-none-enter-active,
-.motion-none-leave-active {
-  transition: none;
-}
-.playback-pulse {
-  animation: playback-pulse var(--motion-duration) var(--motion-easing);
-}
-@keyframes playback-pulse {
-  50% {
-    transform: scale(1.018);
-    filter: brightness(1.14);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .widget-frame,
-  .progress i,
-  [class*='motion-'],
-  .playback-pulse {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-</style>

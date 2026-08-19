@@ -17,15 +17,20 @@ async fn main() {
     manager.add_transport(Box::new(transports::mock::MockTransport));
     manager.start_all();
 
-    let manager_handle = manager.handle();
-    tokio::spawn(async move {
-        if let Err(error) = server::start_server(manager_handle).await {
-            eprintln!("[server] {error}");
-        }
-    });
-
+    let server_manager = manager.handle();
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(manager.handle())
+        .setup(move |app| {
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                if let Err(error) = server::start_server(server_manager, app_handle).await {
+                    eprintln!("[server] {error}");
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![get_widget_url, get_diagnostics, update_transport_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

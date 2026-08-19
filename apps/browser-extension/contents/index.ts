@@ -1,5 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
 import { normalizeMediaTitle, type MediaState } from "@obs-playing/shared"
+import { findYandexMediaElement, readYandexPlayer } from "../core/yandex"
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -80,17 +81,19 @@ const adapters: MediaAdapter[] = [
     service: "Yandex Music",
     matches: () => location.hostname === "music.yandex.ru",
     read: () => {
-      const session = sessionState()
+      const player = findYandexMediaElement(document)
+      const metadata = navigator.mediaSession?.metadata
+      const session = player && metadata?.title ? {
+        title: metadata.title,
+        artists: metadata.artist ? [metadata.artist] : [],
+        album: metadata.album || undefined,
+        artwork: metadata.artwork?.at(-1)?.src || artwork(),
+        duration: Number.isFinite(player.duration) ? player.duration : undefined,
+        position: Number.isFinite(player.currentTime) ? player.currentTime : undefined,
+        isPlaying: !player.paused && !player.ended,
+      } : null
       if (session) return session
-      const player = mediaElement()
-      const title = text(".track__title")
-      if (!title) return null
-      return {
-        title,
-        artists: [...document.querySelectorAll<HTMLElement>(".track__artists a")].map((item) => item.innerText.trim()).filter(Boolean),
-        artwork: artwork(".track-cover img, .player-controls__track-cover img"),
-        isPlaying: player ? !player.paused && !player.ended : Boolean(document.querySelector(".player-controls__btn_pause")),
-      }
+      return readYandexPlayer(document)
     },
   },
   {
@@ -123,5 +126,26 @@ function publish() {
   chrome.runtime.sendMessage({ ...state, title: normalizeMediaTitle(state.title), source: { transportId: "extension", service: adapter.service } satisfies MediaState["source"] })
 }
 
+let publishTimer: number | undefined
+function queuePublish() {
+  if (publishTimer) return
+  publishTimer = window.setTimeout(() => {
+    publishTimer = undefined
+    publish()
+  }, 300)
+}
+
+const observer = new MutationObserver(queuePublish)
+observer.observe(document.documentElement, { childList: true, subtree: true })
+window.addEventListener("popstate", queuePublish)
+window.addEventListener("yt-navigate-finish", queuePublish)
+window.addEventListener("yMusicStatePatchesUpdated", queuePublish)
+window.addEventListener("hashchange", queuePublish)
+document.addEventListener("play", queuePublish, true)
+document.addEventListener("pause", queuePublish, true)
+document.addEventListener("ended", queuePublish, true)
 publish()
-setInterval(publish, 2_000)
+setInterval(queuePublish, 2_000)
+
+// Yandex hydrates its player asynchronously after a SPA navigation.
+for (const delay of [250, 750, 1_500, 3_000, 6_000]) window.setTimeout(queuePublish, delay)

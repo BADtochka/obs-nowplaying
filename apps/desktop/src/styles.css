@@ -37,4 +37,7 @@
   body {
     @apply m-0 overflow-hidden bg-background text-foreground antialiased;
   }
+  body.widget-page {
+    @apply bg-transparent;
+  }
 }

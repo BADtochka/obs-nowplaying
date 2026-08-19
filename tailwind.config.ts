@@ -26,6 +26,23 @@ export default {
         card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
       },
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
+      keyframes: {
+        'playback-pulse': {
+          '50%': { transform: 'scale(1.018)', filter: 'brightness(1.14)' },
+        },
+        marquee: {
+          '0%, 12%': { transform: 'translateX(0)' },
+          '88%, 100%': { transform: 'translateX(calc(-1 * var(--marquee-distance)))' },
+        },
+        'accordion-down': { from: { height: '0' }, to: { height: 'var(--reka-accordion-content-height)' } },
+        'accordion-up': { from: { height: 'var(--reka-accordion-content-height)' }, to: { height: '0' } },
+      },
+      animation: {
+        'playback-pulse': 'playback-pulse 1s ease',
+        marquee: 'marquee var(--marquee-duration) ease-in-out infinite alternate',
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
+      },
     },
   },
   plugins: [animate],

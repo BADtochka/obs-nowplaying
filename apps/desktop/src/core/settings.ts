@@ -10,7 +10,7 @@ import type { TransportConfig, TransportMode } from './types';
 
 export const STORAGE_KEY = 'obs-playing.desktop-settings';
 export const LEGACY_STORAGE_KEY = 'obs-playing.settings';
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 7;
 
 export interface SavedSettings {
   version: number;
@@ -24,9 +24,10 @@ export const DEFAULT_SETTINGS: Omit<WidgetSettings, 'animations'> = {
   primaryColor: '#f6f2ea',
   secondaryColor: '#aaa7a1',
   borderRadius: 8,
+  cardPadding: 12,
   accentMode: 'artwork',
   accentColor: '#d4a56a',
-  customCss: '',
+  marqueeEnabled: true,
 };
 
 export const DEFAULT_TRANSPORTS: TransportConfig = {
@@ -55,7 +56,8 @@ export function parseSavedSettings(raw: string | null): SavedSettings {
   try {
     const value = JSON.parse(raw) as Partial<SavedSettings>;
     if ((value.version ?? 1) > SETTINGS_VERSION) return result;
-    if (value.layout && layoutOptions.some((option) => option.id === value.layout)) result.layout = value.layout;
+    if (value.layout === 'card') result.layout = 'compact';
+    else if (value.layout && layoutOptions.some((option) => option.id === value.layout)) result.layout = value.layout;
     const saved = value.settings as Partial<WidgetSettings> | undefined;
     if (saved) {
       for (const key of ['backgroundColor', 'primaryColor', 'secondaryColor', 'accentColor'] as const)
@@ -64,8 +66,9 @@ export function parseSavedSettings(raw: string | null): SavedSettings {
         result.settings.accentMode = saved.accentMode;
       if (typeof saved.borderRadius === 'number' && Number.isFinite(saved.borderRadius))
         result.settings.borderRadius = clamp(saved.borderRadius, 0, 32);
-      if (typeof saved.customCss === 'string' && saved.customCss.length <= 10_000)
-        result.settings.customCss = saved.customCss;
+      if (typeof saved.cardPadding === 'number' && Number.isFinite(saved.cardPadding))
+        result.settings.cardPadding = clamp(saved.cardPadding, 0, 32);
+      if (typeof saved.marqueeEnabled === 'boolean') result.settings.marqueeEnabled = saved.marqueeEnabled;
       const animations = saved.animations as Partial<WidgetAnimations> | undefined;
       if (animations)
         for (const event of ['show', 'hide', 'change', 'playback'] as const) {

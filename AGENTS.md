@@ -1,3 +1,0 @@
-- Use 'bun' as the default package manager for all operations.
-- Lint command: bun x eslint .
-- Typecheck command: bun x tsc --noEmit

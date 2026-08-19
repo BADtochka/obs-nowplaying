@@ -2,7 +2,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Translate } from '@/app/i18n';
+import type { Translate } from '@/core/i18n';
 import { animationEasings, animationPresets, type WidgetSettings } from '@/media';
 
 const props = defineProps<{ settings: WidgetSettings; t: Translate }>();
@@ -22,7 +22,6 @@ function eventLabel(event: (typeof events)[number]) {
 
 <template>
   <section class="min-w-0 space-y-3">
-    <h3 class="font-medium">{{ t('animations') }}</h3>
     <div
       v-for="event in events"
       :key="event"

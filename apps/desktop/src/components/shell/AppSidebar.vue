@@ -2,8 +2,8 @@
 import { Home, Palette, Radio } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Locale, Section } from '@/app/types';
-import type { Translate } from '@/app/i18n';
+import type { Locale, Section } from '@/core/types';
+import type { Translate } from '@/core/i18n';
 
 defineProps<{ connected: boolean; t: Translate }>();
 const section = defineModel<Section>('section', { required: true });
@@ -26,7 +26,10 @@ const sections = [
       >
       <div class="hidden min-w-0 md:block">
         <h1 class="truncate text-sm font-semibold">OBS Playing</h1>
-        <p class="text-xs text-muted-foreground">{{ t('mediaBridge') }}</p>
+        <p class="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span class="size-1.5 rounded-full" :class="connected ? 'bg-emerald-500' : 'bg-destructive'" />
+          {{ connected ? t('connectedShort') : t('reconnectingShort') }}
+        </p>
       </div>
     </div>
     <nav class="grid w-full gap-1" :aria-label="t('configuration')">
@@ -44,16 +47,12 @@ const sections = [
         <span class="hidden md:inline">{{ t(item.label) }}</span>
       </Button>
     </nav>
-    <div class="mt-5 w-full md:px-2">
+    <div class="mt-auto w-full pt-6 md:px-2">
       <label class="mb-1 hidden text-xs text-muted-foreground md:block">{{ t('language') }}</label>
       <Select v-model="locale">
         <SelectTrigger class="h-9 w-full px-2" :aria-label="t('language')"><SelectValue /></SelectTrigger>
         <SelectContent><SelectItem value="en">EN</SelectItem><SelectItem value="ru">RU</SelectItem></SelectContent>
       </Select>
     </div>
-    <p class="mt-auto hidden items-center gap-2 px-2 pt-6 text-xs text-muted-foreground md:flex">
-      <span class="size-2 rounded-full" :class="connected ? 'bg-emerald-500' : 'bg-destructive'" />
-      {{ connected ? t('connected') : t('reconnecting') }}
-    </p>
   </aside>
 </template>

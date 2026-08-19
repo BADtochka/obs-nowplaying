@@ -23,7 +23,28 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "icon": ["icons/icon.png"]
+    "targets": ["nsis", "msi"],
+    "createUpdaterArtifacts": true,
+    "icon": ["icons/icon.png"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "Russian"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "__TAURI_UPDATER_PUBLIC_KEY__",
+      "endpoints": [
+        "https://github.com/BADtochka/obs-nowplaying/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
