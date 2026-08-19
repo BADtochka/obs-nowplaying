@@ -24,5 +24,8 @@
     "apps/*",
     "packages/*"
   ],
-  "packageManager": "bun@1.3.10"
+  "packageManager": "bun@1.3.10",
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
 }

@@ -1,6 +1,8 @@
 import type { PlasmoCSConfig } from "plasmo"
 import { normalizeMediaTitle, type MediaState } from "@obs-playing/shared"
-import { findYandexMediaElement, readYandexPlayer } from "../core/yandex"
+import { findYandexMediaElement, findYandexMediaElements, readYandexPlayer } from "../core/yandex"
+import { matchProvider } from "../core/provider-pipeline"
+import { sendRuntimeMessage } from "../core/runtime"
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -10,6 +12,7 @@ export const config: PlasmoCSConfig = {
     "https://open.spotify.com/*",
     "https://vk.com/*",
   ],
+  run_at: "document_idle",
 }
 
 interface MediaAdapter {
@@ -80,21 +83,7 @@ const adapters: MediaAdapter[] = [
   {
     service: "Yandex Music",
     matches: () => location.hostname === "music.yandex.ru",
-    read: () => {
-      const player = findYandexMediaElement(document)
-      const metadata = navigator.mediaSession?.metadata
-      const session = player && metadata?.title ? {
-        title: metadata.title,
-        artists: metadata.artist ? [metadata.artist] : [],
-        album: metadata.album || undefined,
-        artwork: metadata.artwork?.at(-1)?.src || artwork(),
-        duration: Number.isFinite(player.duration) ? player.duration : undefined,
-        position: Number.isFinite(player.currentTime) ? player.currentTime : undefined,
-        isPlaying: !player.paused && !player.ended,
-      } : null
-      if (session) return session
-      return readYandexPlayer(document)
-    },
+    read: () => readYandexPlayer(document, findYandexMediaElement(document)),
   },
   {
     service: "Spotify",
@@ -119,11 +108,41 @@ const adapters: MediaAdapter[] = [
   },
 ]
 
-function publish() {
+let lastPublishedKey = ""
+let lastPublishedAt = 0
+const lastDiagnostics = new Map<string, string>()
+const provider = matchProvider(location.hostname, location.pathname)
+
+function report(stage: string, reason: string) {
+  if (!provider) return
+  if (lastDiagnostics.get(stage) === reason) return
+  lastDiagnostics.set(stage, reason)
+  void sendRuntimeMessage({ type: "obs-playing:debug", provider: provider.id, stage, reason }).catch(() => undefined)
+}
+
+function publish(heartbeat = false) {
   const adapter = adapters.find((candidate) => candidate.matches())
+  if (!adapter || !provider) {
+    report("adapter", "no-match")
+    return
+  }
+  report("adapter", "matched")
   const state = adapter?.read()
-  if (!adapter || !state || !state.title) return
-  chrome.runtime.sendMessage({ ...state, title: normalizeMediaTitle(state.title), source: { transportId: "extension", service: adapter.service } satisfies MediaState["source"] })
+  if (!state || !state.title) {
+    report("parser", "waiting-for-player")
+    return
+  }
+  report("parser", "state-ready")
+  const normalized = { ...state, title: normalizeMediaTitle(state.title) }
+  report("playback", normalized.isPlaying ? "confirmed-playing" : "initial-paused")
+  const progressBucket = Math.floor((normalized.position || 0) / 2)
+  const key = JSON.stringify([adapter.service, normalized.isPlaying, normalized.title, normalized.artists, normalized.artwork, progressBucket])
+  if (key === lastPublishedKey && (!heartbeat || Date.now() - lastPublishedAt < 6_000)) return
+  lastPublishedKey = key
+  lastPublishedAt = Date.now()
+  void sendRuntimeMessage({ ...normalized, source: { transportId: "extension", service: adapter.service } satisfies MediaState["source"] })
+    .then(() => report("message", "accepted"))
+    .catch(() => report("message", "runtime-unavailable"))
 }
 
 let publishTimer: number | undefined
@@ -144,8 +163,33 @@ window.addEventListener("hashchange", queuePublish)
 document.addEventListener("play", queuePublish, true)
 document.addEventListener("pause", queuePublish, true)
 document.addEventListener("ended", queuePublish, true)
+// Preview controls can be divs that do not dispatch media events in Firefox.
+document.addEventListener("click", queuePublish, true)
+
+const hookedYandexMedia = new WeakSet<HTMLMediaElement>()
+function hookYandexMedia() {
+  if (location.hostname !== "music.yandex.ru") return
+  for (const media of findYandexMediaElements(document)) {
+    if (hookedYandexMedia.has(media)) continue
+    hookedYandexMedia.add(media)
+    media.addEventListener("timeupdate", queuePublish, { passive: true })
+    for (const event of ["play", "pause", "ended", "loadedmetadata", "canplay", "emptied", "seeked"]) {
+      media.addEventListener(event, queuePublish, { passive: true })
+    }
+  }
+}
+
+const yandexObserver = new MutationObserver(() => {
+  hookYandexMedia()
+  queuePublish()
+})
+if (location.hostname === "music.yandex.ru") yandexObserver.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+hookYandexMedia()
 publish()
-setInterval(queuePublish, 2_000)
+setInterval(() => publish(true), 2_000)
 
 // Yandex hydrates its player asynchronously after a SPA navigation.
-for (const delay of [250, 750, 1_500, 3_000, 6_000]) window.setTimeout(queuePublish, delay)
+for (const delay of [250, 750, 1_500, 3_000, 6_000]) window.setTimeout(() => {
+  hookYandexMedia()
+  queuePublish()
+}, delay)

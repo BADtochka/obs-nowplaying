@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { Translate } from '@/core/i18n';
-import type { Diagnostics, TransportConfig } from '@/core/types';
+import { extensionProviders, type Diagnostics, type ExtensionProvider, type TransportConfig } from '@/core/types';
 
 const props = defineProps<{
   transports: TransportConfig;
@@ -18,6 +18,13 @@ function dateTime(value: number | null) {
   return value
     ? new Intl.DateTimeFormat(props.locale, { dateStyle: 'short', timeStyle: 'medium' }).format(value)
     : props.t('noUpdate');
+}
+const providerLabel = (provider: ExtensionProvider) => props.t(provider);
+const providerEnabled = (provider: ExtensionProvider) => props.transports.browserExtensionProviders.includes(provider);
+function setProviderEnabled(provider: ExtensionProvider, enabled: boolean) {
+  props.transports.browserExtensionProviders = enabled
+    ? [...new Set([...props.transports.browserExtensionProviders, provider])]
+    : props.transports.browserExtensionProviders.filter((item) => item !== provider);
 }
 </script>
 
@@ -38,6 +45,31 @@ function dateTime(value: number | null) {
         </SelectContent>
       </Select>
     </div>
+    <Card class="mt-4">
+      <CardContent class="space-y-4 pt-6">
+        <div>
+          <h3 class="font-medium">{{ t('extensionProviders') }}</h3>
+          <p class="mt-1 text-xs text-muted-foreground">{{ t('extensionProvidersHint') }}</p>
+        </div>
+        <div class="max-w-xs space-y-2">
+          <Label>{{ t('selectedProvider') }}</Label>
+          <Select v-model="transports.browserExtensionProvider" :disabled="!transports.browserExtensionEnabled">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">{{ t('auto') }}</SelectItem>
+              <SelectItem v-for="provider in extensionProviders" :key="provider" :value="provider" :disabled="!providerEnabled(provider)">{{ providerLabel(provider) }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label v-for="provider in extensionProviders" :key="provider" class="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
+            {{ providerLabel(provider) }}
+            <Switch :model-value="providerEnabled(provider)" :disabled="!transports.browserExtensionEnabled" @update:model-value="setProviderEnabled(provider, $event)" />
+          </label>
+        </div>
+        <p v-if="!transports.browserExtensionEnabled" class="text-xs text-muted-foreground">{{ t('providerDisabled') }}</p>
+      </CardContent>
+    </Card>
     <div v-if="diagnostics" class="mt-7 grid gap-3">
       <Card v-for="transport in diagnostics.transports.filter((item) => item.id !== 'mock')" :key="transport.id">
         <CardContent class="grid gap-4 pt-6 sm:grid-cols-[minmax(0,1fr)_auto_6rem_9rem] sm:items-center">

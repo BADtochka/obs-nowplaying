@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
@@ -90,7 +90,43 @@ pub struct TransportConfig {
     pub browser_extension_enabled: bool,
     pub native_media_priority: i32,
     pub browser_extension_priority: i32,
+    pub browser_extension_providers: Vec<ExtensionProvider>,
+    pub browser_extension_provider: ExtensionProviderSelection,
     pub mode: TransportMode,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub enum ExtensionProvider { YandexMusic, YoutubeMusic, Youtube, Spotify, VkMusic }
+
+impl ExtensionProvider {
+    pub fn from_service(service: Option<&str>) -> Option<Self> {
+        match service {
+            Some("Yandex Music") => Some(Self::YandexMusic),
+            Some("YouTube Music") => Some(Self::YoutubeMusic),
+            Some("YouTube") => Some(Self::Youtube),
+            Some("Spotify") => Some(Self::Spotify),
+            Some("VK Music") => Some(Self::VkMusic),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExtensionProviderSelection { Auto, YandexMusic, YoutubeMusic, Youtube, Spotify, VkMusic }
+
+impl ExtensionProviderSelection {
+    fn provider(self) -> Option<ExtensionProvider> {
+        match self {
+            Self::Auto => None,
+            Self::YandexMusic => Some(ExtensionProvider::YandexMusic),
+            Self::YoutubeMusic => Some(ExtensionProvider::YoutubeMusic),
+            Self::Youtube => Some(ExtensionProvider::Youtube),
+            Self::Spotify => Some(ExtensionProvider::Spotify),
+            Self::VkMusic => Some(ExtensionProvider::VkMusic),
+        }
+    }
 }
 
 impl Default for TransportConfig {
@@ -100,6 +136,11 @@ impl Default for TransportConfig {
             browser_extension_enabled: true,
             native_media_priority: 10,
             browser_extension_priority: 20,
+            browser_extension_providers: vec![
+                ExtensionProvider::YandexMusic, ExtensionProvider::YoutubeMusic, ExtensionProvider::Youtube,
+                ExtensionProvider::Spotify, ExtensionProvider::VkMusic,
+            ],
+            browser_extension_provider: ExtensionProviderSelection::Auto,
             mode: TransportMode::Auto,
         }
     }
@@ -160,6 +201,8 @@ impl TransportManagerHandle {
     pub fn update_config(&self, mut config: TransportConfig) -> ManagerDiagnostics {
         config.native_media_priority = config.native_media_priority.clamp(-100, 100);
         config.browser_extension_priority = config.browser_extension_priority.clamp(-100, 100);
+        let mut seen = HashSet::new();
+        config.browser_extension_providers.retain(|provider| seen.insert(*provider));
         #[cfg(not(debug_assertions))]
         if config.mode == TransportMode::Mock {
             config.mode = TransportMode::Auto;
@@ -174,6 +217,9 @@ impl TransportManagerHandle {
             }
         }
         inner.config = config;
+        if inner.sources.get("extension").is_some_and(|entry| !Self::extension_provider_allowed(&inner.config, &entry.state)) {
+            inner.sources.remove("extension");
+        }
         // A deliberate configuration change should take effect without source-switch debounce.
         inner.last_switch_at = 0;
         let selected = Self::select_active(&mut inner, now_ms());
@@ -307,6 +353,12 @@ impl TransportManagerHandle {
         }
     }
 
+    pub fn extension_provider_allowed(config: &TransportConfig, media: &MediaState) -> bool {
+        let Some(provider) = ExtensionProvider::from_service(media.source.service.as_deref()) else { return false; };
+        config.browser_extension_providers.contains(&provider)
+            && config.browser_extension_provider.provider().map_or(true, |selected| selected == provider)
+    }
+
     fn diagnostics_locked(inner: &mut ManagerInner, active: Option<MediaState>) -> ManagerDiagnostics {
         let active_id = active.as_ref().map(|media| media.source.transport_id.as_str());
         let config = inner.config.clone();
@@ -436,9 +488,23 @@ mod tests {
             browser_extension_enabled: true,
             native_media_priority: 30,
             browser_extension_priority: 20,
+            browser_extension_providers: TransportConfig::default().browser_extension_providers,
+            browser_extension_provider: ExtensionProviderSelection::Auto,
             mode: TransportMode::Auto,
         };
         m.update_config(config);
         assert_eq!(m.current().unwrap().title, "Native");
+    }
+
+    #[test]
+    fn extension_provider_selection_rejects_other_services() {
+        let mut config = TransportConfig::default();
+        config.browser_extension_provider = ExtensionProviderSelection::Spotify;
+        let mut spotify = state("Spotify", true);
+        spotify.source.service = Some("Spotify".into());
+        let mut yandex = state("Yandex", true);
+        yandex.source.service = Some("Yandex Music".into());
+        assert!(TransportManagerHandle::extension_provider_allowed(&config, &spotify));
+        assert!(!TransportManagerHandle::extension_provider_allowed(&config, &yandex));
     }
 }

@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { ref, useAttrs, watch } from 'vue';
+import { computed, ref, useAttrs, watch } from 'vue';
 import { extractArtworkAccent } from '../artwork-cache';
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<{ src: string }>();
-const emit = defineEmits<{ accent: [resource: { src: string; accent: string | null }] }>();
+const emit = defineEmits<{ accent: [resource: Awaited<ReturnType<typeof extractArtworkAccent>>] }>();
 const attrs = useAttrs();
 const loaded = ref(false);
-const imageSrc = () => {
+const proxyFailed = ref(false);
+const imageSrc = computed(() => {
+  if (proxyFailed.value) return props.src;
   const url = new URL('/artwork', 'http://127.0.0.1:3030');
   url.searchParams.set('url', props.src);
   return url.toString();
-};
+});
 watch(
   () => props.src,
   () => {
     loaded.value = false;
+    proxyFailed.value = false;
   },
   { immediate: true },
 );
@@ -26,13 +29,19 @@ function onLoad(event: Event) {
   const src = image.getAttribute('data-artwork-src') ?? props.src;
   void extractArtworkAccent(src, image).then((resource) => emit('accent', resource));
 }
+
+function onError() {
+  // The proxy may be rate-limited upstream. Keep a directly loadable cover visible;
+  // canvas sampling will safely fail if that image does not grant CORS access.
+  if (!proxyFailed.value) proxyFailed.value = true;
+}
 </script>
 
 <template>
   <img
     :key="src"
-    crossorigin="anonymous"
-    :src="imageSrc()"
+    :crossorigin="proxyFailed ? undefined : 'anonymous'"
+    :src="imageSrc"
     :data-artwork-src="src"
     alt=""
     loading="eager"
@@ -43,5 +52,6 @@ function onLoad(event: Event) {
     ]"
     v-bind="attrs"
     @load="onLoad"
+    @error="onError"
   />
 </template>

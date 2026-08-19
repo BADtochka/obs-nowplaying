@@ -3,13 +3,13 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { layoutRegistry } from './layouts';
 import WidgetCard from './layouts/WidgetCard.vue';
 import type { AnimationSetting, MediaState, WidgetSettings } from '../media';
-import { shouldResetArtworkAccent } from '../artwork-accent';
+import type { ArtworkPalette, ArtworkResource } from '../artwork-cache';
 
 const props = defineProps<{ media: MediaState | null; layout: string; settings: WidgetSettings }>();
 const currentLayout = computed(() => {
   return layoutRegistry[props.layout] ?? layoutRegistry.compact;
 });
-const artworkAccent = ref(props.settings.accentColor);
+const artworkPalette = ref<ArtworkPalette | null>(null);
 const now = ref(Date.now());
 let animationFrame = 0;
 function updateClock() {
@@ -29,9 +29,20 @@ const progressAnchor = ref<{
 const animation = ref<AnimationSetting>(props.settings.animations.show);
 const playbackPulse = ref(false);
 let playbackTimer: number | undefined;
-const accent = computed(() =>
-  props.settings.accentMode === 'artwork' ? artworkAccent.value : props.settings.accentColor,
-);
+const customColors = computed(() => ({
+  background: props.settings.backgroundColor,
+  primary: props.settings.primaryColor,
+  secondary: props.settings.secondaryColor,
+  accent: props.settings.accentColor,
+}));
+const colors = computed(() => Object.fromEntries(
+  (['background', 'primary', 'secondary', 'accent'] as const).map((role) => [
+    role,
+    props.settings.colorSources[role] === 'artwork'
+      ? artworkPalette.value?.[role] ?? customColors.value[role]
+      : customColors.value[role],
+  ]),
+) as typeof customColors.value);
 const progress = computed(() => {
   const anchor = progressAnchor.value;
   if (!anchor || anchor.duration <= 0) return null;
@@ -120,17 +131,9 @@ watch(
   { immediate: true },
 );
 
-watch(
-  () => [props.media?.artwork, props.settings.accentMode] as const,
-  (next, previous) => {
-    if (shouldResetArtworkAccent(previous, next)) artworkAccent.value = props.settings.accentColor;
-  },
-  { immediate: true },
-);
-
-function applyArtworkAccent(resource: { src: string; accent: string | null }) {
-  if (props.settings.accentMode !== 'artwork' || props.media?.artwork !== resource.src) return;
-  artworkAccent.value = resource.accent ?? props.settings.accentColor;
+function applyArtworkAccent(resource: ArtworkResource) {
+  if (props.media?.artwork !== resource.src) return;
+  artworkPalette.value = resource.palette;
 }
 
 onBeforeUnmount(() => {
@@ -144,7 +147,7 @@ onBeforeUnmount(() => {
     :class="{
       'animate-playback-pulse [animation-duration:var(--motion-duration)] [animation-timing-function:var(--motion-easing)] motion-reduce:animate-none': playbackPulse,
     }"
-    :style="[{ '--accent': accent }, transitionStyle]"
+    :style="[{ '--background': colors.background, '--primary': colors.primary, '--secondary': colors.secondary, '--accent': colors.accent }, transitionStyle]"
   >
     <Transition
       :enter-active-class="transitionClasses.active"
@@ -160,6 +163,7 @@ onBeforeUnmount(() => {
         :key="trackKey(renderedMedia)"
         :settings="settings"
         :progress="progress"
+        :artwork="renderedMedia.artwork"
       >
         <component :is="currentLayout.component" :media="renderedMedia" :settings="settings" @artwork-accent="applyArtworkAccent" />
       </WidgetCard>

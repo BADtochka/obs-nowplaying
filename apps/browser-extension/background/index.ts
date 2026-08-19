@@ -1,19 +1,46 @@
 import { ExtensionTransport } from "../core/transport"
 import { statusSnapshot } from "../core/status"
 import type { MediaState } from "@obs-playing/shared"
+import { mediaValidationReason, selectTabMedia } from "../core/provider-pipeline"
+import type { ProviderDebug } from "../core/status"
 
 const transport = new ExtensionTransport()
-const tabs = new Map<number, { state: MediaState; lastSeen: number }>()
-const STALE_TAB_MS = 8_000
+interface TabState {
+  state: MediaState
+  lastSeen: number
+  hasPlayed: boolean
+}
 
-chrome.runtime.onMessage.addListener((message: unknown, sender) => {
+const tabs = new Map<number, TabState>()
+const STALE_TAB_MS = 15_000
+let debug: ProviderDebug | null = null
+
+chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (isPopupRequest(message)) {
-    return Promise.resolve(statusSnapshot(transport.snapshot(), detectedMediaState()))
+    sendResponse(statusSnapshot(transport.snapshot(), detectedMediaState(), debug))
+    // Chromium closes callback channels unless the listener explicitly keeps one open.
+    return true
+  }
+  if (isDebugMessage(message)) {
+    debug = { provider: message.provider, stage: message.stage, reason: message.reason, updatedAt: Date.now() }
+    return
   }
   const tabId = sender.tab?.id
-  if (tabId === undefined || !isMediaState(message)) return
+  const validationReason = mediaValidationReason(message)
+  if (tabId === undefined || validationReason) {
+    if (tabId !== undefined) debug = { provider: "unknown", stage: "validation", reason: validationReason || "missing-tab", updatedAt: Date.now() }
+    return
+  }
 
-  tabs.set(tabId, { state: message, lastSeen: Date.now() })
+  const media = message as MediaState
+  const hasPlayed = tabs.get(tabId)?.hasPlayed || media.isPlaying
+  tabs.set(tabId, { state: media, lastSeen: Date.now(), hasPlayed })
+  debug = {
+    provider: media.source.service || "unknown",
+    stage: "playback",
+    reason: hasPlayed ? "state-accepted" : "rejected:initial-paused",
+    updatedAt: Date.now(),
+  }
   publishActiveTab()
 })
 
@@ -31,27 +58,20 @@ setInterval(() => {
 }, 2_000)
 
 function publishActiveTab() {
-  const now = Date.now()
-  const active = [...tabs.values()]
-    .filter((entry) => entry.lastSeen >= now - STALE_TAB_MS && entry.state.isPlaying)
-    .sort((left, right) => right.lastSeen - left.lastSeen)[0]
-
-  transport.publish(active?.state ?? null)
-}
-
-function isMediaState(value: unknown): value is MediaState {
-  if (!value || typeof value !== "object") return false
-  const media = value as Partial<MediaState>
-  return typeof media.title === "string"
-    && Array.isArray(media.artists)
-    && typeof media.isPlaying === "boolean"
-    && typeof media.source?.service === "string"
+  transport.publish(selectTabMedia(tabs.values(), Date.now(), STALE_TAB_MS))
 }
 
 function detectedMediaState() {
-  return [...tabs.values()].sort((left, right) => right.lastSeen - left.lastSeen)[0]?.state ?? null
+  return selectTabMedia(tabs.values(), Date.now(), STALE_TAB_MS)
 }
 
 function isPopupRequest(value: unknown): value is { type: "obs-playing:status" } {
   return Boolean(value && typeof value === "object" && (value as { type?: unknown }).type === "obs-playing:status")
+}
+
+function isDebugMessage(value: unknown): value is { type: "obs-playing:debug"; provider: string; stage: string; reason: string } {
+  if (!value || typeof value !== "object") return false
+  const message = value as Record<string, unknown>
+  return message.type === "obs-playing:debug" && typeof message.provider === "string"
+    && typeof message.stage === "string" && typeof message.reason === "string"
 }

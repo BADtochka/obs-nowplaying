@@ -2,14 +2,24 @@ import type { MediaState } from '@obs-playing/shared';
 
 export type { MediaState };
 
+export type ColorRole = 'background' | 'primary' | 'secondary' | 'accent';
+export type ColorSource = 'custom' | 'artwork';
+export type ColorSources = Record<ColorRole, ColorSource>;
+
 export interface WidgetSettings {
   backgroundColor: string;
   primaryColor: string;
   secondaryColor: string;
   borderRadius: number;
   cardPadding: number;
-  accentMode: 'custom' | 'artwork';
   accentColor: string;
+  colorSources: ColorSources;
+  borderEnabled: boolean;
+  borderColor: string;
+  borderWidth: number;
+  blurredBackgroundEnabled: boolean;
+  backgroundBlur: number;
+  backgroundOpacity: number;
   marqueeEnabled: boolean;
   animations: WidgetAnimations;
 }

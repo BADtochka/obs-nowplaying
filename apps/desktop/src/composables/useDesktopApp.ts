@@ -54,6 +54,8 @@ export function useDesktopApp(t: Translate) {
   async function refreshDiagnostics() {
     try {
       diagnostics.value = await invoke<Diagnostics>('get_diagnostics');
+      if (JSON.stringify(transports) !== JSON.stringify(diagnostics.value.config))
+        Object.assign(transports, diagnostics.value.config);
       error.value = '';
     } catch {
       diagnostics.value = null;

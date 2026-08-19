@@ -16,8 +16,17 @@ export function buildWidgetUrl(baseUrl: string, layout: string, settings: Widget
   url.searchParams.set('secondary', settings.secondaryColor);
   url.searchParams.set('radius', String(settings.borderRadius));
   url.searchParams.set('padding', String(settings.cardPadding));
-  url.searchParams.set('accentMode', settings.accentMode);
   url.searchParams.set('accent', settings.accentColor);
+  for (const role of ['background', 'primary', 'secondary', 'accent'] as const)
+    url.searchParams.set(`${role}Source`, settings.colorSources[role]);
+  // Keep old widget URLs readable by older releases while colorSources is adopted.
+  url.searchParams.set('accentMode', settings.colorSources.accent);
+  url.searchParams.set('border', settings.borderEnabled ? '1' : '0');
+  url.searchParams.set('borderColor', settings.borderColor);
+  url.searchParams.set('borderWidth', String(settings.borderWidth));
+  url.searchParams.set('blurredBackground', settings.blurredBackgroundEnabled ? '1' : '0');
+  url.searchParams.set('backgroundBlur', String(settings.backgroundBlur));
+  url.searchParams.set('backgroundOpacity', String(settings.backgroundOpacity));
   url.searchParams.set('marquee', settings.marqueeEnabled ? '1' : '0');
   for (const [event, animation] of Object.entries(settings.animations))
     url.searchParams.set(`animation-${event}`, `${animation.preset},${animation.duration},${animation.easing}`);
@@ -41,7 +50,31 @@ export function parseWidgetUrl(search: string | URLSearchParams): WidgetUrlConfi
     if (value && /^#[0-9a-f]{6}$/i.test(value)) settings[setting] = value;
   }
 
-  settings.accentMode = params.get('accentMode') === 'custom' ? 'custom' : 'artwork';
+  for (const role of ['background', 'primary', 'secondary', 'accent'] as const) {
+    const source = params.get(`${role}Source`);
+    if (source === 'custom' || source === 'artwork') settings.colorSources[role] = source;
+  }
+  const legacyAccentMode = params.get('accentMode');
+  if (!params.has('accentSource') && (legacyAccentMode === 'custom' || legacyAccentMode === 'artwork'))
+    settings.colorSources.accent = legacyAccentMode;
+  for (const [parameter, setting] of [
+    ['borderColor', 'borderColor'],
+  ] as const) {
+    const value = params.get(parameter);
+    if (value && /^#[0-9a-f]{6}$/i.test(value)) settings[setting] = value;
+  }
+  if (params.get('border') === '0' || params.get('border') === '1') settings.borderEnabled = params.get('border') === '1';
+  if (params.get('blurredBackground') === '0' || params.get('blurredBackground') === '1')
+    settings.blurredBackgroundEnabled = params.get('blurredBackground') === '1';
+  for (const [parameter, setting, min, max] of [
+    ['borderWidth', 'borderWidth', 1, 8],
+    ['backgroundBlur', 'backgroundBlur', 0, 40],
+    ['backgroundOpacity', 'backgroundOpacity', 0, 100],
+  ] as const) {
+    const raw = params.get(parameter);
+    const value = Number(raw);
+    if (raw !== null && Number.isFinite(value)) settings[setting] = Math.min(max, Math.max(min, value));
+  }
   const marquee = params.get('marquee');
   if (marquee === '0' || marquee === '1') settings.marqueeEnabled = marquee === '1';
   const radiusValue = params.get('radius');

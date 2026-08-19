@@ -12,7 +12,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
-use crate::transports::{MediaState, TransportManagerHandle};
+use crate::transports::{ExtensionProvider, ExtensionProviderSelection, MediaState, TransportManagerHandle};
 
 const SERVER_ADDR: &str = "127.0.0.1:3030";
 const MAX_INGEST_BYTES: usize = 32 * 1024;
@@ -26,9 +26,27 @@ struct AppState {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HealthResponse {
     status: &'static str,
     has_active_media: bool,
+    extension_config: ExtensionConfigResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExtensionConfigResponse {
+    enabled: bool,
+    providers: Vec<ExtensionProvider>,
+    provider: ExtensionProviderSelection,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ExtensionConfigUpdate {
+    enabled: bool,
+    providers: Vec<ExtensionProvider>,
+    provider: ExtensionProviderSelection,
 }
 
 #[derive(Deserialize)]
@@ -39,6 +57,7 @@ struct ArtworkQuery {
 pub async fn start_server(manager: TransportManagerHandle, app_handle: AppHandle) -> Result<(), String> {
     let app = Router::new()
         .route("/health", get(health))
+        .route("/extension-config", get(extension_config).put(update_extension_config))
         .route("/ingest", post(ingest).delete(clear_ingest))
         .route("/ws", get(ws_handler))
         .route("/widget", get(widget_page))
@@ -49,7 +68,7 @@ pub async fn start_server(manager: TransportManagerHandle, app_handle: AppHandle
         .layer(
             CorsLayer::new()
                 .allow_origin(AllowOrigin::predicate(|origin, _| is_allowed_origin(origin)))
-                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
                 .allow_headers([CONTENT_TYPE]),
         )
         .with_state(AppState { manager, app: app_handle });
@@ -205,10 +224,36 @@ fn is_public_ipv6(ip: Ipv6Addr) -> bool {
 }
 
 async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
+    let config = state.manager.config();
     Json(HealthResponse {
         status: "ok",
         has_active_media: state.manager.current().is_some(),
+        extension_config: extension_config_response(&config),
     })
+}
+
+fn extension_config_response(config: &crate::transports::TransportConfig) -> ExtensionConfigResponse {
+    ExtensionConfigResponse {
+        enabled: config.browser_extension_enabled,
+        providers: config.browser_extension_providers.clone(),
+        provider: config.browser_extension_provider,
+    }
+}
+
+async fn extension_config(State(state): State<AppState>) -> Json<ExtensionConfigResponse> {
+    Json(extension_config_response(&state.manager.config()))
+}
+
+async fn update_extension_config(
+    State(state): State<AppState>,
+    Json(update): Json<ExtensionConfigUpdate>,
+) -> Json<ExtensionConfigResponse> {
+    let mut config = state.manager.config();
+    config.browser_extension_enabled = update.enabled;
+    config.browser_extension_providers = update.providers;
+    config.browser_extension_provider = update.provider;
+    let diagnostics = state.manager.update_config(config);
+    Json(extension_config_response(&diagnostics.config))
 }
 
 async fn ingest(
@@ -219,6 +264,9 @@ async fn ingest(
         return Err((StatusCode::SERVICE_UNAVAILABLE, "browser extension transport is disabled"));
     }
     validate_media(&media)?;
+    if !TransportManagerHandle::extension_provider_allowed(&state.manager.config(), &media) {
+        return Err((StatusCode::SERVICE_UNAVAILABLE, "browser extension provider is disabled or not selected"));
+    }
     media.title = normalize_title(&media.title);
     media.artists = media.artists.into_iter().map(|artist| artist.trim().to_string()).filter(|artist| !artist.is_empty()).collect();
     media.source.transport_id = "extension".to_string();
@@ -351,7 +399,9 @@ fn handle_socket_ingest(manager: &TransportManagerHandle, payload: &str) {
         return;
     };
     if let Some(value) = media.as_mut() {
-        if !manager.transport_enabled("extension") || validate_media(value).is_err() {
+        if !manager.transport_enabled("extension")
+            || validate_media(value).is_err()
+            || !TransportManagerHandle::extension_provider_allowed(&manager.config(), value) {
             return;
         }
         value.title = normalize_title(&value.title);
@@ -440,5 +490,21 @@ mod tests {
         assert_eq!(normalize_title("Song - YouTube"), "Song");
         assert_eq!(normalize_title("YouTube: Song"), "Song");
         assert_eq!(normalize_title("YouTube Musician"), "YouTube Musician");
+    }
+
+    #[test]
+    fn health_serializes_extension_config_for_the_extension() {
+        let config = crate::transports::TransportConfig::default();
+        let response = HealthResponse {
+            status: "ok",
+            has_active_media: false,
+            extension_config: extension_config_response(&config),
+        };
+
+        let json = serde_json::to_value(response).unwrap();
+        assert_eq!(json["status"], "ok");
+        assert_eq!(json["extensionConfig"]["enabled"], true);
+        assert_eq!(json["extensionConfig"]["provider"], "auto");
+        assert_eq!(json["extensionConfig"]["providers"][0], "yandexMusic");
     }
 }

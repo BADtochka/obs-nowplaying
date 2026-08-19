@@ -21,6 +21,11 @@ describe('buildWidgetUrl', () => {
     settings.cardPadding = 18;
     settings.animations.show.duration = 0;
     settings.marqueeEnabled = false;
+    settings.colorSources.primary = 'artwork';
+    settings.borderEnabled = true;
+    settings.borderWidth = 3;
+    settings.blurredBackgroundEnabled = true;
+    settings.backgroundOpacity = 72;
 
     const url = new URL(buildWidgetUrl('http://127.0.0.1:3030/widget', 'horizontal', settings));
     const parsed = parseWidgetUrl(url.searchParams);
@@ -31,6 +36,15 @@ describe('buildWidgetUrl', () => {
     expect(parsed.settings.cardPadding).toBe(18);
     expect(parsed.settings.animations.show.duration).toBe(0);
     expect(parsed.settings.marqueeEnabled).toBe(false);
+    expect(parsed.settings.colorSources.primary).toBe('artwork');
+    expect(parsed.settings.borderEnabled).toBe(true);
+    expect(parsed.settings.borderWidth).toBe(3);
+    expect(parsed.settings.blurredBackgroundEnabled).toBe(true);
+    expect(parsed.settings.backgroundOpacity).toBe(72);
+  });
+
+  it('reads legacy accentMode URLs', () => {
+    expect(parseWidgetUrl('?accentMode=custom').settings.colorSources.accent).toBe('custom');
   });
 
   it('falls back for invalid widget parameters', () => {

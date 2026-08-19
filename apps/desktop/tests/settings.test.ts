@@ -32,6 +32,35 @@ describe('parseSavedSettings', () => {
     expect(parseSavedSettings(JSON.stringify({ settings: { cardPadding: 90 } })).settings.cardPadding).toBe(32);
   });
 
+  it('migrates legacy accent mode and validates appearance sources', () => {
+    const parsed = parseSavedSettings(JSON.stringify({
+      version: 7,
+      settings: {
+        accentMode: 'custom',
+        colorSources: { background: 'artwork', primary: 'invalid' },
+        borderEnabled: true,
+        borderWidth: 99,
+        blurredBackgroundEnabled: true,
+        backgroundBlur: 99,
+        backgroundOpacity: -10,
+      },
+    }));
+    expect(parsed.settings.colorSources).toEqual({ background: 'artwork', primary: 'custom', secondary: 'custom', accent: 'custom' });
+    expect(parsed.settings.borderEnabled).toBe(true);
+    expect(parsed.settings.borderWidth).toBe(8);
+    expect(parsed.settings.backgroundBlur).toBe(40);
+    expect(parsed.settings.backgroundOpacity).toBe(0);
+  });
+
+  it('validates extension provider config', () => {
+    const parsed = parseSavedSettings(JSON.stringify({ transports: {
+      browserExtensionProviders: ['spotify', 'unknown', 'spotify'],
+      browserExtensionProvider: 'spotify',
+    } }));
+    expect(parsed.transports.browserExtensionProviders).toEqual(['spotify']);
+    expect(parsed.transports.browserExtensionProvider).toBe('spotify');
+  });
+
   it('maps the removed card preset to compact', () => {
     expect(parseSavedSettings(JSON.stringify({ version: 5, layout: 'card' })).layout).toBe('compact');
   });
