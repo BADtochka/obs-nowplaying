@@ -7,6 +7,8 @@
     "dev": "tauri dev",
     "dev:firefox": "tauri dev",
     "build": "tauri build",
+    "build:windows:cross": "tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'",
+    "build:windows:cross:signed": "tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis",
     "vite:dev": "vite",
     "vite:build": "vue-tsc && vite build",
     "preview": "vite preview",

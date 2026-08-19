@@ -5,7 +5,7 @@
     "dev": "turbo dev",
     "dev:firefox": "turbo dev:firefox",
     "build": "turbo build",
-    "build:firefox": "bun run --cwd apps/browser-extension build:firefox",
+    "build:windows": "bun run --cwd apps/desktop build:windows:cross",
     "typecheck": "tsc --noEmit && bun run --cwd apps/desktop vite:build",
     "lint": "eslint .",
     "test": "bun run --cwd apps/desktop test"

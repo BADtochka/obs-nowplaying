@@ -4,23 +4,31 @@ node_modules/
 
 # Build outputs
 .turbo/
+**/.turbo/
 dist/
 **/dist/
 build/
 **/build/
 out/
+**/out/
 bin/
+**/bin/
 
 # Rust/Tauri specific
+target/
+**/target/
 src-tauri/target/
 **/src-tauri/target/
+**/src-tauri/bundle/
 **/src-tauri/gen/
 **/*.rs.bk
-.tauri
+.tauri/
+**/.tauri/
 gen/
 
 # Plasmo/Extension specific
 .plasmo/
+**/.plasmo/
 **/build/chrome-mv3*/
 **/build/firefox-mv3*/
 
@@ -40,5 +48,10 @@ Thumbs.db
 !.env.example
 
 # Temporary files
+.cache/
+**/.cache/
+.xwin-cache/
+**/.xwin-cache/
 *.tmp
 temp/
+**/temp/
